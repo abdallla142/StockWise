@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockWise - AI Stock & Crypto Explorer</title>
+  <link rel="icon" href="https://raw.githubusercontent.com/google-gemini/gemini-kit/main/assets/gemini-logo.png" type="image/x-icon"> 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body, html {
+      height: 100%;
+      background: var(--bg-gradient);
+      background-size: 600% 600%;
+      animation: GradientBG 20s ease infinite;
+      font-family: 'Inter', sans-serif;
+      color: var(--text-color);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      line-height: 1.6;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      position: relative;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    .background-moving-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url('https://www.transparenttextures.com/patterns/carbon-fibre-v2.png');
+      background-repeat: repeat;
+      animation: moveBackground 60s linear infinite;
+      opacity: 0.15; 
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .background-lines-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+          linear-gradient(rgba(0,0,0,0) 1px, rgba(255,255,255,0.05) 1px),
+          linear-gradient(90deg, rgba(0,0,0,0) 1px, rgba(255,255,255,0.05) 1px);
+      background-size: 50px 50px;
+      animation: panLines 120s linear infinite;
+      opacity: 0.2;
+      z-index: -1;
+      pointer-events: none;
+      mix-blend-mode: overlay;
+    }
+
+    /* Moving Stock Ticker Background */
+    .moving-ticker-bg {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 50px; /* Height of the ticker band */
+        overflow: hidden;
+        z-index: -1;
+        opacity: 0.1; /* Very subtle */
+        pointer-events: none;
+        white-space: nowrap;
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 1.8rem;
+        color: rgba(255, 255, 255, 0.7); /* Light color against dark background */
+        background: linear-gradient(to right, rgba(15,32,39,0) 0%, rgba(15,32,39,0.8) 15%, rgba(15,32,39,0.8) 85%, rgba(15,32,39,0) 100%);
+        display: flex;
+        align-items: center;
+    }
+    .moving-ticker-bg span {
+        display: inline-block;
+        padding-left: 100%; /* Start off-screen to the right */
+        animation: tickerMove 60s linear infinite; /* Adjust duration for speed */
+    }
+
+    @keyframes tickerMove {
+        0% { transform: translate(0, 0); }
+        100% { transform: translate(-100%, 0); } /* Move one full width to the left */
+    }
+    /* Add a second span for continuous loop */
+    .moving-ticker-bg span:nth-child(2) {
+        animation-delay: 30s; /* Start halfway through first animation for seamless loop */
+    }
+
+
+    @keyframes panLines {
+        from { background-position: 0 0; }
+        to { background-position: 500px 500px; }
+    }
+
+    .asterisk-effect {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background-color: var(--highlight-color);
+      border-radius: 50%;
+      opacity: 0;
+      animation: sparkle 2s ease-out forwards;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .asterisk-effect:nth-child(even) { animation-delay: 0.5s; background-color: var(--accent-color); }
+    .asterisk-effect:nth-child(3n) { animation-delay: 1s; background-color: var(--button-bg); }
+
+    @keyframes sparkle {
+      0% { transform: scale(0); opacity: 0; }
+      50% { transform: scale(1.5); opacity: 0.8; }
+      100% { transform: scale(0); opacity: 0; }
+    }
+
+    @keyframes moveBackground {
+      from { background-position: 0 0; }
+      to { background-position: 1000px 1000px; }
+    }
+
+    @keyframes GradientBG {
+      0%{background-position:0% 50%}
+      50%{background-position:100% 50%}
+      100%{background-position:0% 50%}
+    }
+
+    :root {
+      /* Reverted to original dark background gradient and header color */
+      --bg-gradient-dark: linear-gradient(270deg, #0f2027, #203a43, #2c5364);
+      --header-bg-dark: rgba(34,197,94,0.9); /* Original header green */
+      --header-text-dark: #0f172a;
+      --header-shadow-dark: #22c55e88; /* Original shadow for glow */
+      --panel-bg-dark: rgba(31, 41, 55, 0.85); /* Slightly less opaque */
+      --panel-shadow-dark: rgb(34 197 94 / 0.7);
+      --input-bg-dark: #111827cc;
+      --input-placeholder-dark: #4ade8099;
+      --input-focus-bg-dark: #22c55e33;
+      --input-focus-border-dark: #4ade80;
+      --input-focus-shadow-dark: rgba(74, 222, 128, 0.3);
+      --button-bg-dark: #4ade80;
+      --button-hover-bg-dark: #16a34a;
+      --button-text-dark: #0f172a;
+      --button-shadow-dark: #22c55eaa;
+      --button-disabled-bg-dark: #4ade8080;
+      --info-bg-dark: #111827cc;
+      --info-shadow-dark: #22c55e55;
+      --label-color-dark: #bbf7d0;
+      --text-color-dark: #e0e6f0;
+      --accent-color-dark: #a7f3d0;
+      --highlight-color-dark: #4ade80;
+      --suggestions-bg-dark: #111827dd;
+      --suggestions-shadow-dark: #22c55eaa;
+      --chat-widget-bg-dark: rgba(31, 41, 55, 0.95);
+      --chat-widget-shadow-dark: #22c55ecc;
+      --chat-header-bg-dark: #22c55e;
+      --chat-header-text-dark: #0f172a;
+      --chat-message-bg-dark: #22c55e22;
+      --chat-message-user-bg-dark: #4ade80;
+      --chat-message-user-text-dark: #0f172a;
+      --chat-input-bg-dark: #22272a;
+      --chat-input-border-dark: #22c55e44;
+      --chat-scrollbar-thumb-dark: #4ade80cc;
+      --chat-scrollbar-track-dark: #111827;
+      --footer-bg-dark: rgba(15, 23, 42, 0.9);
+      --footer-text-dark: #94a3b8;
+      --link-color-dark: #4ade80;
+      --link-hover-color-dark: #16a34a;
+      --red-color: #ef4444;
+      --green-color: #4ade80;
+      --ai-avatar-bg-dark: #4ade80;
+      --ai-avatar-color-dark: #0f172a;
+      --ai-avatar-image: url('https://raw.githubusercontent.com/google-gemini/gemini-kit/main/assets/gemini-logo.png');
+
+
+      --text-color: var(--text-color-dark);
+      --bg-gradient: var(--bg-gradient-dark);
+      --header-bg: var(--header-bg-dark);
+      --header-text: var(--header-text-dark);
+      --header-shadow: var(--header-shadow-dark);
+      --panel-bg: var(--panel-bg-dark);
+      --panel-shadow: var(--panel-shadow-dark);
+      --input-bg: var(--input-bg-dark);
+      --input-placeholder: var(--input-placeholder-dark);
+      --input-focus-bg: var(--input-focus-bg-dark);
+      --input-focus-border: var(--input-focus-border-dark);
+      --input-focus-shadow: var(--input-focus-shadow-dark);
+      --button-bg: var(--button-bg-dark);
+      --button-hover-bg: var(--button-hover-bg-dark);
+      --button-text: var(--button-text-dark);
+      --button-shadow: var(--button-shadow-dark);
+      --button-disabled-bg: var(--button-disabled-bg-dark);
+      --info-bg: var(--info-bg-dark);
+      --info-shadow: var(--info-shadow-dark);
+      --label-color: var(--label-color-dark);
+      --accent-color: var(--accent-color-dark);
+      --highlight-color: var(--highlight-color-dark);
+      --suggestions-bg: var(--suggestions-bg-dark);
+      --suggestions-shadow: var(--suggestions-shadow-dark);
+      --chat-widget-bg: var(--chat-widget-bg-dark);
+      --chat-widget-shadow: var(--chat-widget-shadow-dark);
+      --chat-header-bg: var(--chat-header-bg-dark);
+      --chat-header-text: var(--chat-header-text-dark);
+      --chat-message-bg: var(--chat-message-bg-dark);
+      --chat-message-user-bg: var(--chat-message-user-bg-dark);
+      --chat-message-user-text: var(--chat-message-user-text-dark);
+      --chat-input-bg: var(--chat-input-bg-dark);
+      --chat-input-border: var(--chat-input-border-dark);
+      --chat-scrollbar-thumb: var(--chat-scrollbar-thumb-dark);
+      --chat-scrollbar-track: var(--chat-scrollbar-track-dark);
+      --footer-bg: var(--footer-bg-dark);
+      --footer-text: var(--footer-text-dark);
+      --link-color: var(--link-color-dark);
+      --link-hover-color: var(--link-hover-color-dark);
+      --red-color: #ef4444;
+      --green-color: #4ade80;
+      --ai-avatar-bg: var(--ai-avatar-bg-dark);
+      --ai-avatar-color: var(--ai-avatar-color-dark);
+      --ai-avatar-img: url('https://raw.githubusercontent.com/google-gemini/gemini-kit/main/assets/gemini-logo.png');
+    }
+
+    /* Light Mode */
+    body.light-mode {
+      --bg-gradient: linear-gradient(270deg, #e0f2f7, #c1e4ee, #a8d5e0);
+      --header-bg: #4CAF50;
+      --header-text: #ffffff;
+      --header-shadow: rgba(0, 0, 0, 0.2);
+      --panel-bg: rgba(255, 255, 255, 0.9);
+      --panel-shadow: rgba(0, 0, 0, 0.15);
+      --input-bg: #f8f9fa;
+      --input-placeholder: #888;
+      --input-focus-bg: #e6f7ff;
+      --input-focus-border: #007bff;
+      --input-focus-shadow: rgba(0, 123, 255, 0.25);
+      --button-bg: #28a745;
+      --button-hover-bg: #218838;
+      --button-text: #ffffff;
+      --button-shadow: rgba(40, 167, 69, 0.3);
+      --button-disabled-bg: #95d6a2;
+      --info-bg: #ffffff;
+      --info-shadow: rgba(0, 0, 0, 0.05);
+      --label-color: #333;
+      --text-color: #333;
+      --accent-color: #007bff;
+      --highlight-color: #0056b3;
+      --suggestions-bg: #ffffff;
+      --suggestions-shadow: rgba(0, 0, 0, 0.1);
+      --chat-widget-bg: rgba(255, 255, 255, 0.98);
+      --chat-widget-shadow: rgba(0, 0, 0, 0.2);
+      --chat-header-bg: #4CAF50;
+      --chat-header-text: #ffffff;
+      --chat-message-bg: #e9ecef;
+      --chat-message-user-bg: #007bff;
+      --chat-message-user-text: #ffffff;
+      --chat-input-bg: #f0f2f5;
+      --chat-input-border: #ddd;
+      --chat-scrollbar-thumb: #888;
+      --chat-scrollbar-track: #f1f1f1;
+      --footer-bg: #f8f9fa;
+      --footer-text: #6c757d;
+      --link-color: #007bff;
+      --link-hover-color: #0056b3;
+      --ai-avatar-bg: #4CAF50;
+      --ai-avatar-color: #ffffff;
+      --ai-avatar-image: url('https://raw.githubusercontent.com/google-gemini/gemini-kit/main/assets/gemini-logo.png');
+    }
+
+    body {
+      background: var(--bg-gradient);
+    }
+
+    header {
+      background: var(--header-bg);
+      padding: 24px 20px;
+      text-align: center;
+      font-weight: 900;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      letter-spacing: 2px;
+      color: var(--header-text);
+      text-shadow: 0 0 10px #22c55e88; /* Reverted to original text-shadow */
+      user-select: none;
+      box-shadow: 0 5px 15px #16a34aaa; /* Reverted to original box-shadow */
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 2px solid rgba(34, 197, 94, 0.7);
+      transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .tab-nav {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        max-width: 400px;
+        margin: 20px auto 0 auto;
+        background: var(--panel-bg);
+        border-radius: 12px;
+        padding: 8px;
+        box-shadow: 0 4px 15px var(--panel-shadow);
+        z-index: 15;
+        position: relative;
+    }
+    .tab-button {
+        flex: 1;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--text-color);
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+        outline: none;
+    }
+    .tab-button:hover {
+        background: var(--input-focus-bg);
+        color: var(--highlight-color);
+    }
+    .tab-button.active {
+        background: var(--button-bg);
+        color: var(--button-text);
+        box-shadow: 0 2px 10px var(--button-shadow);
+    }
+    .tab-button.active:hover {
+        background: var(--button-hover-bg);
+    }
+
+    main {
+      flex: 1;
+      display: flex; /* Changed to flex to control page containers */
+      flex-direction: column; /* Stacks content vertically */
+      justify-content: center;
+      align-items: center; /* Center horizontally */
+      padding: 30px 20px;
+      max-width: 1300px;
+      margin: 0 auto;
+      width: 100%;
+      position: relative;
+      z-index: 5;
+      gap: 30px; /* Gap between stacked sections like tools/resources */
+    }
+
+    .page-container {
+        display: none; /* Hidden by default, shown by JS */
+        width: 100%; /* Take full width of main */
+        display: grid; /* Inner grid for its own panels */
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 30px;
+        transition: opacity 0.5s ease; /* Smooth transition for page change */
+        opacity: 0; /* Start hidden for transition */
+    }
+    .page-container.active {
+        display: grid;
+        opacity: 1; /* Fade in */
+    }
+
+    /* Centering search panels */
+    .stock-panel, .crypto-panel {
+      grid-column: 1 / -1; /* Make search panel span full width of its page container */
+      max-width: 600px; /* Limit its max width */
+      margin: 0 auto; /* Center it */
+    }
+
+    .stock-panel,
+    .info-section,
+    .graph-section,
+    .crypto-panel,
+    .tools-section {
+      background: var(--panel-bg);
+      border-radius: 18px;
+      box-shadow: 0 6px 30px var(--panel-shadow);
+      padding: 30px 35px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      color: var(--text-color);
+      transition: all 0.3s ease-in-out;
+      backdrop-filter: blur(6px); /* Reverted blur */
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      z-index: 10;
+      position: relative;
+    }
+    .stock-panel:hover,
+    .info-section:hover,
+    .graph-section:hover,
+    .crypto-panel:hover,
+    .tools-section:hover {
+      box-shadow: 0 8px 40px var(--panel-shadow);
+      transform: translateY(-3px);
+    }
+    body.light-mode .stock-panel,
+    body.light-mode .info-section,
+    body.light-mode .graph-section,
+    body.light-mode .crypto-panel,
+    body.light-mode .tools-section {
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      backdrop-filter: none;
+    }
+
+    /* New container for Info + Chart side-by-side */
+    .data-chart-container {
+        grid-column: 1 / -1; /* This container takes full width of its parent grid */
+        display: flex; /* Use flexbox for horizontal layout */
+        flex-wrap: wrap; /* Allow wrapping on smaller screens */
+        gap: 20px; /* Space between info and chart */
+        align-items: stretch; /* Align items to stretch to same height */
+        justify-content: center; /* Center horizontally if space allows */
+    }
+
+    .stock-info, .crypto-info { /* Info display panels */
+        flex: 1; /* Allow info panel to grow */
+        min-width: 300px; /* Minimum width before wrapping */
+        max-width: 400px; /* Max width for info panel */
+        background: var(--info-bg);
+        border-radius: 18px;
+        padding: 25px;
+        box-shadow: inset 0 0 20px var(--info-shadow);
+        color: var(--accent-color);
+        font-weight: 500;
+        font-size: 1.05rem;
+        user-select: text;
+        transition: color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+        white-space: pre-wrap;
+        line-height: 1.5;
+        overflow-wrap: break-word;
+    }
+    
+    .graph-section { /* Chart sections */
+      flex: 2; /* Allow graph section to take more space, ~2/3 of available flex space */
+      min-width: 450px; /* Increased min width for charts */
+      min-height: 400px; /* Min height for chart area */
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+    /* Reset grid-column span as it's now inside a flex container */
+    .data-chart-container > .graph-section {
+        grid-column: auto;
+    }
+
+
+    .stock-panel label, .crypto-panel label {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--label-color);
+      user-select: none;
+      transition: color 0.3s ease;
+    }
+
+    .stock-panel input[type="text"], .crypto-panel input[type="text"] {
+      padding: 16px 20px;
+      border-radius: 14px;
+      border: 1px solid transparent;
+      font-size: 1.15rem;
+      outline: none;
+      background: var(--input-bg);
+      color: var(--accent-color);
+      transition: all 0.3s ease;
+      user-select: text;
+      font-weight: 500;
+    }
+    .stock-panel input[type="text"]::placeholder, .crypto-panel input[type="text"]::placeholder {
+      color: var(--input-placeholder);
+    }
+    .stock-panel input[type="text"]:focus, .crypto-panel input[type="text"]:focus {
+      background: var(--input-focus-bg);
+      color: var(--highlight-color);
+      border-color: var(--input-focus-border);
+      box-shadow: 0 0 0 3px var(--input-focus-shadow);
+    }
+
+    .stock-panel button, .crypto-panel button {
+      margin-top: 15px;
+      background: var(--button-bg);
+      border: none;
+      border-radius: 14px;
+      padding: 15px;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--button-text);
+      cursor: pointer;
+      transition: background 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease, color 0.3s ease;
+      user-select: none;
+      box-shadow: 0 5px 15px var(--button-shadow);
+      letter-spacing: 0.05em;
+    }
+    .stock-panel button:hover, .crypto-panel button:hover {
+      background: var(--button-hover-bg);
+      box-shadow: 0 8px 25px var(--button-shadow);
+      transform: translateY(-2px);
+    }
+    .stock-panel button:active, .crypto-panel button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px var(--button-shadow);
+    }
+    .stock-panel button:disabled, .crypto-panel button:disabled {
+      background: var(--button-disabled-bg);
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .stock-info h2, .crypto-info h2 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      font-size: 2.3rem;
+      color: var(--highlight-color);
+      font-weight: 900;
+      user-select: text;
+      letter-spacing: 0.02em;
+      transition: color 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .stock-info h2 img, .crypto-info h2 img {
+        height: 35px;
+        width: 35px;
+        object-fit: contain;
+        border-radius: 5px;
+    }
+    .crypto-info h2 img {
+        border-radius: 50%;
+    }
+
+
+    .stock-info p, .crypto-info p {
+      margin: 10px 0;
+      user-select: text;
+    }
+    .stock-info strong, .crypto-info strong {
+      color: var(--label-color);
+      transition: color 0.3s ease;
+    }
+    .stock-info em, .crypto-info em {
+      font-size: 0.9em;
+      opacity: 0.8;
+      display: block;
+      margin-top: 15px;
+    }
+    .text-green { color: var(--green-color) !important; }
+    .text-red { color: var(--red-color) !important; }
+
+    .suggestions {
+      position: relative;
+    }
+    .suggestions-list {
+      position: absolute;
+      background: var(--suggestions-bg);
+      max-height: 200px;
+      overflow-y: auto;
+      width: 100%;
+      border-radius: 0 0 18px 18px;
+      box-shadow: 0 10px 25px var(--suggestions-shadow);
+      z-index: 100;
+      border-top: 1px solid rgba(34, 197, 94, 0.3);
+      list-style: none;
+      padding: 0;
+      user-select: none;
+      transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+    }
+    body.light-mode .suggestions-list {
+      border-top: 1px solid rgba(0,0,0,0.1);
+    }
+    .suggestion-item {
+      padding: 15px 22px;
+      cursor: pointer;
+      color: var(--accent-color);
+      transition: background 0.2s ease, color 0.2s ease;
+      font-weight: 600;
+      user-select: none;
+    }
+    .suggestion-item:hover, .suggestion-item:focus {
+      background: var(--input-focus-bg);
+      color: var(--highlight-color);
+      outline: none;
+    }
+    .suggestion-item:last-child {
+      border-bottom-left-radius: 18px;
+      border-bottom-right-radius: 18px;
+    }
+
+    #ai-chat-widget {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      width: clamp(300px, 90vw, 420px);
+      max-height: 600px;
+      background: var(--chat-widget-bg);
+      border-radius: 25px;
+      box-shadow: 0 8px 40px var(--chat-widget-shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-size: 15px;
+      color: var(--text-color);
+      font-weight: 500;
+      user-select: none;
+      z-index: 1000;
+      transition: transform 0.3s ease, opacity 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+      border: 1px solid rgba(34, 197, 94, 0.5);
+    }
+    body.light-mode #ai-chat-widget {
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    #theme-toggle {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: var(--button-bg);
+        color: var(--button-text);
+        border: none;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        font-size: 1.5rem;
+        cursor: pointer;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        z-index: 1002;
+        transition: background 0.3s ease, color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    #theme-toggle:hover {
+        background: var(--button-hover-bg);
+        transform: scale(1.05);
+    }
+    #theme-toggle:active {
+        transform: scale(0.95);
+    }
+
+    #ai-chat-toggle {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: var(--chat-header-bg);
+        color: var(--chat-header-text);
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 2rem;
+        font-weight: 800;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(34, 197, 94, 0.7);
+        z-index: 1001;
+        transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+        border: none;
+        outline: none;
+        animation: pulse 2s infinite;
+    }
+    #ai-chat-toggle:hover {
+        background: var(--button-hover-bg);
+        transform: scale(1.05);
+    }
+    #ai-chat-toggle:active {
+        transform: scale(0.95);
+    }
+    #ai-chat-widget.hidden {
+        transform: translateY(100%) translateX(100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+        70% { box-shadow: 0 0 0 20px rgba(34, 197, 94, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    #ai-chat-header {
+      background: var(--chat-header-bg);
+      padding: 18px 25px;
+      font-weight: 700;
+      font-size: 1.4rem;
+      color: var(--chat-header-text);
+      text-align: center;
+      user-select: text;
+      letter-spacing: 0.04em;
+      text-shadow: 0 1px 8px rgba(22, 163, 74, 0.7);
+      border-bottom: 1px solid rgba(22, 163, 74, 0.5);
+      cursor: grab;
+      transition: background 0.3s ease, color 0.3s ease, border-bottom 0.3s ease;
+    }
+    body.light-mode #ai-chat-header {
+      text-shadow: none;
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+    }
+
+    #ai-chat-log {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 25px 28px;
+      background: var(--input-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      font-family: 'Inter', sans-serif;
+      user-select: text;
+      scroll-behavior: smooth;
+      transition: background 0.3s ease;
+    }
+
+    .chat-message {
+      display: flex;
+      gap: 15px;
+      align-items: flex-start;
+      max-width: 90%;
+    }
+    .chat-message.user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    .chat-message .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--ai-avatar-bg);
+      color: var(--ai-avatar-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 800;
+      user-select: none;
+      flex-shrink: 0;
+      font-size: 22px;
+      box-shadow: 0 0 12px var(--button-shadow);
+      transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+      background-image: var(--ai-avatar-img);
+      background-size: 70%;
+      background-repeat: no-repeat;
+      background-position: center;
+      font-size: 0;
+    }
+
+    .chat-message.user .avatar {
+      background: var(--chat-message-user-text);
+      color: var(--chat-message-user-bg);
+      box-shadow: 0 0 12px rgba(22, 163, 74, 0.7);
+      background-image: none;
+      font-size: 22px;
+    }
+    body.light-mode .chat-message.user .avatar {
+      box-shadow: 0 0 12px rgba(0, 123, 255, 0.5);
+    }
+
+    .chat-message .message-text {
+      background: var(--chat-message-bg);
+      padding: 16px 22px;
+      border-radius: 22px;
+      color: var(--accent-color);
+      line-height: 1.5;
+      font-weight: 600;
+      white-space: pre-wrap;
+      box-shadow: 0 0 12px var(--info-shadow);
+      transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+      word-break: break-word;
+    }
+    .chat-message.user .message-text {
+      background: var(--chat-message-user-bg);
+      color: var(--chat-message-user-text);
+      box-shadow: 0 0 14px rgba(22, 163, 74, 0.9);
+    }
+    body.light-mode .chat-message.user .message-text {
+      box-shadow: 0 0 14px rgba(0, 123, 255, 0.5);
+    }
+
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 10px 15px;
+      background: var(--input-bg);
+      border-radius: 20px;
+      font-style: italic;
+      color: var(--accent-color);
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    .typing-indicator span {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: var(--highlight-color);
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out;
+    }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+
+    #ai-chat-input-section {
+      padding: 18px 25px;
+      background: var(--input-bg);
+      display: flex;
+      gap: 15px;
+      border-top: 1px solid var(--chat-input-border);
+      transition: background 0.3s ease, border-top-color 0.3s ease;
+    }
+    #ai-chat-input {
+      flex-grow: 1;
+      padding: 14px 20px;
+      border-radius: 26px;
+      border: 1px solid transparent;
+      font-size: 1.1rem;
+      color: var(--accent-color);
+      background: var(--chat-input-bg);
+      outline: none;
+      transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
+      user-select: text;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+    #ai-chat-input::placeholder {
+      color: var(--input-placeholder);
+    }
+    #ai-chat-input:focus {
+      background: var(--input-focus-bg);
+      color: var(--highlight-color);
+      border-color: var(--input-focus-border);
+      box-shadow: 0 0 0 3px var(--input-focus-shadow);
+    }
+    #ai-chat-send {
+      background: var(--button-bg);
+      border: none;
+      border-radius: 26px;
+      padding: 0 26px;
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: var(--button-text);
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 5px 12px var(--button-shadow);
+      transition: background 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease, color 0.3s ease;
+      letter-spacing: 0.04em;
+    }
+    #ai-chat-send:hover {
+      background: var(--button-hover-bg);
+      box-shadow: 0 7px 18px var(--button-shadow);
+      transform: translateY(-1px);
+    }
+    #ai-chat-send:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px var(--button-shadow);
+    }
+    #ai-chat-send:disabled {
+      background: var(--button-disabled-bg);
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    #ai-chat-log::-webkit-scrollbar,
+    .suggestions-list::-webkit-scrollbar {
+      width: 10px;
+    }
+    #ai-chat-log::-webkit-scrollbar-thumb,
+    .suggestion-item::-webkit-scrollbar-thumb {
+      background: var(--chat-scrollbar-thumb);
+      border-radius: 5px;
+      border: 2px solid var(--chat-scrollbar-track);
+      transition: background 0.3s ease;
+    }
+    #ai-chat-log::-webkit-scrollbar-track,
+    .suggestions-list::-webkit-scrollbar-track {
+      background: var(--chat-scrollbar-track);
+      border-radius: 5px;
+      transition: background 0.3s ease;
+    }
+
+    footer {
+      background: var(--footer-bg);
+      color: var(--footer-text);
+      text-align: center;
+      padding: 20px;
+      font-size: 0.9rem;
+      border-top: 1px solid rgba(34, 197, 94, 0.3);
+      margin-top: auto;
+      transition: background 0.3s ease, color 0.3s ease, border-top-color 0.3s ease;
+      position: relative;
+      z-index: 10;
+    }
+    body.light-mode footer {
+      border-top-color: rgba(0,0,0,0.1);
+    }
+    footer a {
+      color: var(--link-color);
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+    footer a:hover {
+      color: var(--link-hover-color);
+      text-decoration: underline;
+    }
+
+    .info-section, .tools-section {
+        grid-column: span 1; 
+        max-width: 600px; 
+        margin: 0 auto; 
+        width: 100%; 
+        display: flex; /* Ensure these sections also behave as flex containers for their content */
+        flex-direction: column;
+    }
+    .info-section h3, .graph-section h3, .crypto-panel h3, .tools-section h3 {
+      font-size: 1.8rem;
+      color: var(--highlight-color);
+      margin-bottom: 15px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .info-section ul, .tools-section ul {
+      list-style: none;
+      padding: 0;
+    }
+    .info-section li, .tools-section li {
+      margin-bottom: 10px;
+      font-size: 1.05rem;
+      color: var(--accent-color);
+    }
+    .info-section a, .tools-section a {
+      color: var(--link-color);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.3s ease;
+    }
+    .info-section a:hover, .tools-section a:hover {
+      color: var(--link-hover-color);
+      text-decoration: underline;
+    }
+    .info-section p, .tools-section p {
+      font-size: 1.05rem;
+      color: var(--accent-color);
+    }
+
+    .graph-section {
+      flex: 2; 
+      min-width: 450px;
+      min-height: 400px;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+    .graph-placeholder {
+      width: 100%;
+      height: 300px;
+      background: var(--input-bg);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: var(--input-placeholder);
+      font-style: italic;
+      border: 1px dashed var(--chat-input-border);
+      font-size: 1.1rem;
+      gap: 5px;
+      position: relative;
+    }
+    .graph-placeholder small {
+        font-size: 0.9em;
+        color: var(--footer-text);
+    }
+    .graph-placeholder canvas {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 300px;
+    }
+    .graph-placeholder:has(canvas) > *:not(canvas) {
+        display: none;
+    }
+
+    .crypto-panel .crypto-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .crypto-panel .crypto-item {
+      background: var(--input-bg);
+      border-radius: 10px;
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent-color);
+      box-shadow: inset 0 0 10px rgba(34, 197, 94, 0.1);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+    .crypto-panel .crypto-item:hover {
+        background: var(--input-focus-bg);
+        box-shadow: inset 0 0 15px rgba(34, 197, 94, 0.2);
+    }
+    .crypto-panel .crypto-symbol {
+      color: var(--highlight-color);
+      font-weight: 800;
+    }
+
+    @media (max-width: 900px) {
+      .page-container {
+        grid-template-columns: 1fr; 
+      }
+      .stock-panel, .crypto-panel {
+        max-width: 450px; 
+        margin: 0 auto;
+      }
+      .data-chart-container {
+          flex-direction: column; 
+          align-items: center;
+      }
+      .stock-info, .crypto-info, .graph-section {
+          flex: none; 
+          width: 100%; 
+          max-width: 450px; 
+          min-width: unset; 
+      }
+      .info-section, .tools-section {
+          grid-column: 1 / -1; 
+          max-width: 450px;
+          margin: 0 auto;
+      }
+    }
+
+    @media (max-width: 768px) {
+      main {
+        padding: 20px 15px;
+        gap: 25px;
+      }
+      .stock-panel, .info-section, .graph-section, .crypto-panel, .tools-section {
+        padding: 25px 30px;
+      }
+      header {
+        font-size: clamp(1.8rem, 8vw, 2.8rem);
+        padding: 18px 15px;
+      }
+      .info-section h3, .graph-section h3, .crypto-panel h3, .tools-section h3 {
+        font-size: 1.6rem;
+      }
+      .graph-placeholder {
+        height: 250px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stock-panel, .info-section, .graph-section, .crypto-panel, .tools-section {
+        width: calc(100% - 30px);
+        margin: 0 15px;
+        padding: 20px 25px;
+      }
+      main {
+        padding: 15px 10px;
+        gap: 20px;
+      }
+      header {
+        font-size: clamp(1.5rem, 10vw, 2.5rem);
+        padding: 15px 10px;
+      }
+      .info-section h3, .graph-section h3, .crypto-panel h3, .tools-section h3 {
+        font-size: 1.4rem;
+      }
+      .stock-panel label, .crypto-panel label {
+        font-size: 1.1rem;
+      }
+      .stock-panel input[type="text"], .crypto-panel input[type="text"] {
+        padding: 12px 16px;
+        font-size: 1rem;
+      }
+      .stock-panel button, .crypto-panel button {
+        padding: 12px;
+        font-size: 1.1rem;
+      }
+      .stock-info, .crypto-info {
+        padding: 20px;
+        font-size: 0.95rem;
+      }
+      .stock-info h2, .crypto-info h2 {
+        font-size: 1.8rem;
+      }
+      .graph-placeholder {
+        height: 200px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="background-moving-overlay"></div>
+  <div class="background-lines-overlay"></div> 
+
+  <div class="moving-ticker-bg">
+    <span>AAPL +0.5% | MSFT +1.2% | GOOG -0.3% | TSLA +2.1% | NVDA -1.5% | BTC +0.8% | ETH +1.0% | SOL -0.5% | XRP +0.1% | DOGE +2.0% | LINK -0.2% | UNI +0.7% | </span>
+    <span>AAPL +0.5% | MSFT +1.2% | GOOG -0.3% | TSLA +2.1% | NVDA -1.5% | BTC +0.8% | ETH +1.0% | SOL -0.5% | XRP +0.1% | DOGE +2.0% | LINK -0.2% | UNI +0.7% | </span>
+  </div>
+
+  <header>StockWise</header>
+
+  <nav class="tab-nav">
+    <button id="stock-tab-button" class="tab-button" data-page="stocks">Stocks</button>
+    <button id="crypto-tab-button" class="tab-button" data-page="crypto">Crypto</button>
+  </nav>
+
+  <main>
+    <div id="stocks-page-container" class="page-container">
+        <section class="stock-panel" aria-label="Stock Information Panel">
+            <label for="stock-input">Search Stock Symbol</label>
+            <div class="suggestions">
+                <input
+                    type="text"
+                    id="stock-input"
+                    aria-autocomplete="list"
+                    aria-controls="suggestions-list"
+                    aria-haspopup="listbox"
+                    autocomplete="off"
+                    placeholder="e.g. AAPL, TSLA, MSFT"
+                    spellcheck="false"
+                    aria-describedby="stock-helper"
+                />
+                <div id="suggestions-list" class="suggestions-list" role="listbox" hidden></div>
+            </div>
+            <button id="get-stock" aria-label="Get Stock Information" disabled>Get Info</button>
+        </section>
+
+        <div class="data-chart-container">
+            <div class="stock-info" id="stock-info" aria-live="polite" aria-atomic="true">
+                Enter a stock symbol to see details.
+            </div>
+            <section id="stock-graph-section" class="graph-section" aria-label="Stock Price Chart">
+                <h3 id="stock-chart-title">Stock Price Chart</h3>
+                <div class="graph-placeholder">
+                    <canvas id="stockChartCanvas"></canvas>
+                    <p>Select a stock to see its historical performance.</p>
+                    <small>Historical data for stocks provided by Finnhub.</small>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div id="crypto-page-container" class="page-container">
+        <section class="crypto-panel" aria-label="Cryptocurrency Information Panel">
+            <label for="crypto-input">Search Crypto Symbol</label>
+            <div class="suggestions">
+                <input
+                    type="text"
+                    id="crypto-input"
+                    aria-autocomplete="list"
+                    aria-controls="crypto-suggestions-list"
+                    aria-haspopup="listbox"
+                    autocomplete="off"
+                    placeholder="e.g. BTC, ETH, SOL"
+                    spellcheck="false"
+                    aria-describedby="crypto-helper"
+                />
+                <div id="crypto-suggestions-list" class="suggestions-list" role="listbox" hidden></div>
+            </div>
+            <button id="get-crypto" aria-label="Get Cryptocurrency Information" disabled>Get Info</button>
+        </section>
+
+        <div class="data-chart-container">
+            <div class="crypto-info" id="crypto-info" aria-live="polite" aria-atomic="true">
+                Enter a cryptocurrency symbol to see details.
+            </div>
+            <section id="crypto-graph-section" class="graph-section" aria-label="Cryptocurrency Price Chart">
+                <h3 id="crypto-chart-title">Cryptocurrency Price Chart</h3>
+                <div class="graph-placeholder">
+                    <canvas id="cryptoChartCanvas"></canvas>
+                    <p>Select a cryptocurrency to see its historical performance.</p>
+                    <small>Simulated data for crypto charts (free APIs typically lack historical data).</small>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <section class="info-section" aria-label="Beginner Resources">
+        <h3>Beginner Investor Resources</h3>
+        <p>New to investing? Start here!</p>
+        <ul>
+            <li><a href="https://www.investopedia.com/articles/basics/06/invest1000.asp" target="_blank" rel="noopener noreferrer">Investing for Beginners Guide</a></li>
+            <li><a href="https://www.fidelity.com/learning-center/investment-products/etf/what-are-etfs" target="_blank" rel="noopener noreferrer">Understanding ETFs</a></li>
+            <li><a href="https://www.investopedia.com/terms/m/marketindex.asp" target="_blank" rel="noopener noreferrer">What are Market Indices?</a></li>
+            <li><a href="https://www.nasdaq.com/market-activity/quotes/nasdaq-ndx-index" target="_blank" rel="noopener noreferrer">NASDAQ 100 Index</a></li>
+            <li><a href="https://www.spglobal.com/spdji/en/indices/equity/sp-500/#overview" target="_blank" rel="noopener noreferrer">S&P 500 Index</a></li>
+            <li><a href="https://www.dowjones.com/industrials" target="_blank" rel="noopener noreferrer">Dow Jones Industrial Average</a></li>
+        </ul>
+        <p>Always do your own research before investing.</p>
+    </section>
+
+    <section class="tools-section" aria-label="Useful Financial Tools">
+        <h3>Useful Financial Tools</h3>
+        <p>Enhance your analysis with these external tools:</p>
+        <ul>
+            <li><a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView (Charting & Community)</a></li>
+            <li><a href="https://finance.yahoo.com/" target="_blank" rel="noopener noreferrer">Yahoo Finance (News & Basic Data)</a></li>
+            <li><a href="https://finviz.com/" target="_blank" rel="noopener noreferrer">Finviz (Stock Screener & Heatmaps)</a></li>
+            <li><a href="https://coinmarketcap.com/" target="_blank" rel="noopener noreferrer">CoinMarketCap (Crypto Data & Rankings)</a></li>
+            <li><a href="https://www.dextools.io/app/en/ether/pairs" target="_blank" rel="noopener noreferrer">DEXTools (Decentralized Exchange Data)</a></li>
+            <li><a href="https://zacks.com/" target="_blank" rel="noopener noreferrer">Zacks Investment Research (Stock Analysis)</a></li>
+            <li><a href="https://investing.com/" target="_blank" rel="noopener noreferrer">Investing.com (Global Markets & Tools)</a></li>
+            <li><a href="https://morningstar.com/" target="_blank" rel="noopener noreferrer">Morningstar (Investment Research)</a></li>
+            <li><a href="https://www.federalreserve.gov/data.htm" target="_blank" rel="noopener noreferrer">Federal Reserve Economic Data (FRED)</a></li>
+            <li><a href="https://www.sec.gov/edgar/searchedgar/companysearch.html" target="_blank" rel="noopener noreferrer">SEC EDGAR (Company Filings)</a></li>
+            <li><a href="https://www.macrotrends.net/" target="_blank" rel="noopener noreferrer">Macrotrends (Financial Ratios & Metrics)</a></li>
+            <li><a href="https://cryptopanic.com/" target="_blank" rel="noopener noreferrer">CryptoPanic (News Aggregator)</a></li>
+            <li><a href="https://defillama.com/" target="_blank" rel="noopener noreferrer">DefiLlama (DeFi Data)</a></li>
+            <li><a href="https://messari.io/" target="_blank" rel="noopener noreferrer">Messari (Crypto Research)</a></li>
+        </ul>
+        <p>These tools are external and may require separate accounts.</p>
+    </section>
+  </main>
+
+  <section id="ai-chat-widget" role="region" aria-label="AI Stock Chat Assistant" aria-live="polite">
+    <header id="ai-chat-header">StockWise AI Helper</header>
+    <div id="ai-chat-log" role="log" aria-live="polite" aria-relevant="additions"></div>
+    <form id="ai-chat-form" autocomplete="off" role="search" aria-label="Send message form">
+      <div id="ai-chat-input-section">
+        <input
+          type="text"
+          id="ai-chat-input"
+          aria-label="Type your question"
+          placeholder="Ask me about stocks or investing..."
+          required
+          minlength="2"
+        />
+        <button type="submit" id="ai-chat-send" aria-label="Send message" disabled>Send</button>
+      </div>
+    </form>
+  </section>
+
+  <button id="ai-chat-toggle" aria-expanded="true" aria-controls="ai-chat-widget" aria-label="Toggle AI Chat Widget">
+    AI
+  </button>
+  <button id="theme-toggle" aria-label="Toggle light and dark mode">☀️</button>
+
+  <footer>
+    <p>&copy; 2025 StockWise. All rights reserved. Data provided by <a href="https://finnhub.io/" target="_blank" rel="noopener noreferrer">Finnhub.io</a> (for stocks) and <a href="https://coinmarketcap.com/" target="_blank" rel="noopener noreferrer">CoinMarketCap</a> (for current crypto prices).</p>
+  </footer>
+
+  <script>
+    const FINNHUB_API_KEY = 'd19lpk1r01qmm7u00cggd19lpk1r01qmm7u00ch0'; 
+    const COINMARKETCAP_API_KEY = 'a9d78aeb-3eaa-4e80-8189-ceda2228a55a'; 
+
+    const stockInput = document.getElementById('stock-input');
+    const getStockBtn = document.getElementById('get-stock');
+    const stockInfo = document.getElementById('stock-info');
+    const stockSuggestionsList = document.getElementById('suggestions-list');
+
+    const cryptoInput = document.getElementById('crypto-input');
+    const getCryptoBtn = document.getElementById('get-crypto');
+    const cryptoInfo = document.getElementById('crypto-info');
+    const cryptoSuggestionsList = document.getElementById('crypto-suggestions-list');
+
+    const aiChatWidget = document.getElementById('ai-chat-widget');
+    const aiChatToggle = document.getElementById('ai-chat-toggle');
+    const aiChatLog = document.getElementById('ai-chat-log');
+    const aiChatForm = document.getElementById('ai-chat-form');
+    const aiChatInput = document.getElementById('ai-chat-input');
+    const aiChatSend = document.getElementById('ai-chat-send');
+    const aiChatHeader = document.getElementById('ai-chat-header');
+    const themeToggle = document.getElementById('theme-toggle');
+
+    const stockTabButton = document.getElementById('stock-tab-button');
+    const cryptoTabButton = document.getElementById('crypto-tab-button');
+    const stocksPageContainer = document.getElementById('stocks-page-container'); 
+    const cryptoPageContainer = document.getElementById('crypto-page-container'); 
+
+    const stockChartTitle = document.getElementById('stock-chart-title');
+    const cryptoChartTitle = document.getElementById('crypto-chart-title');
+
+    let lastUserQuery = '';
+    let lastBotResponseCategory = '';
+    let lastAssetSymbolMentioned = '';
+
+    let stockChartInstance = null;
+    let cryptoChartInstance = null;
+
+    const popularStocks = [
+      { symbol: 'AAPL', name: 'Apple Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/aapl.png' },
+      { symbol: 'TSLA', name: 'Tesla, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/TSLA.png' },
+      { symbol: 'MSFT', name: 'Microsoft Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/MSFT.png' },
+      { symbol: 'AMZN', name: 'Amazon.com, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/AMZN.png' },
+      { symbol: 'GOOG', name: 'Alphabet Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/GOOG.png' },
+      { symbol: 'GOOGL', name: 'Alphabet Inc. (Class A)', logo: 'https://companiesmarketcap.com/img/company-logos/GOOGL.png' },
+      { symbol: 'NFLX', name: 'Netflix, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/NFLX.png' },
+      { symbol: 'NVDA', name: 'NVIDIA Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/NVDA.png' },
+      { symbol: 'META', name: 'Meta Platforms, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/META.png' },
+      { symbol: 'INTC', name: 'Intel Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/INTC.png' },
+      { symbol: 'AMD', name: 'Advanced Micro Devices, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/AMD.png' },
+      { symbol: 'DIS', name: 'The Walt Disney Company', logo: 'https://companiesmarketcap.com/img/company-logos/DIS.png' },
+      { symbol: 'PYPL', name: 'PayPal Holdings, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/PYPL.png' },
+      { symbol: 'JPM', name: 'JPMorgan Chase & Co.', logo: 'https://companiesmarketcap.com/img/company-logos/JPM.png' },
+      { symbol: 'V', name: 'Visa Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/V.png' },
+      { symbol: 'JNJ', name: 'Johnson & Johnson', logo: 'https://companiesmarketcap.com/img/company-logos/JNJ.png' },
+      { symbol: 'PG', name: 'Procter & Gamble Co.', logo: 'https://companiesmarketcap.com/img/company-logos/PG.png' },
+      { symbol: 'XOM', name: 'Exxon Mobil Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/XOM.png' },
+      { symbol: 'CVX', name: 'Chevron Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/CVX.png' },
+      { symbol: 'KO', name: 'The Coca-Cola Company', logo: 'https://companiesmarketcap.com/img/company-logos/KO.png' },
+      { symbol: 'PEP', name: 'PepsiCo, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/PEP.png' },
+      { symbol: 'T', name: 'AT&T Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/T.png' },
+      { symbol: 'VZ', name: 'Verizon Communications Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/VZ.png' },
+      { symbol: 'GS', name: 'Goldman Sachs Group Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/GS.png' },
+      { symbol: 'BRK.B', name: 'Berkshire Hathaway Inc. Class B', logo: 'https://companiesmarketcap.com/img/company-logos/BRK.B.png' },
+      { symbol: 'BAC', name: 'Bank of America Corp', logo: 'https://companiesmarketcap.com/img/company-logos/BAC.png' },
+      { symbol: 'WMT', name: 'Walmart Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/WMT.png' },
+      { symbol: 'HD', name: 'The Home Depot, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/HD.png' },
+      { symbol: 'UNH', name: 'UnitedHealth Group Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/UNH.png' },
+      { symbol: 'MA', name: 'Mastercard Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/MA.png' },
+      { symbol: 'PFE', name: 'Pfizer Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/PFE.png' },
+      { symbol: 'CRM', name: 'Salesforce, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/CRM.png' },
+      { symbol: 'ADBE', name: 'Adobe Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/ADBE.png' },
+      { symbol: 'CSCO', name: 'Cisco Systems, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/CSCO.png' },
+      { symbol: 'CMCSA', name: 'Comcast Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/CMCSA.png' },
+      { symbol: 'MRK', name: 'Merck & Co., Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/MRK.png' },
+      { symbol: 'ABT', name: 'Abbott Laboratories', logo: 'https://companiesmarketcap.com/img/company-logos/ABT.png' },
+      { symbol: 'NKE', name: 'NIKE, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/NKE.png' },
+      { symbol: 'MCD', name: 'McDonald\'s Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/MCD.png' },
+      { symbol: 'COST', name: 'Costco Wholesale Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/COST.png' },
+      { symbol: 'ORCL', name: 'Oracle Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/ORCL.png' },
+      { symbol: 'PM', name: 'Philip Morris International Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/PM.png' },
+      { symbol: 'BA', name: 'The Boeing Company', logo: 'https://companiesmarketcap.com/img/company-logos/BA.png' },
+      { symbol: 'GE', name: 'General Electric Company', logo: 'https://companiesmarketcap.com/img/company-logos/GE.png' },
+      { symbol: 'HON', name: 'Honeywell International Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/HON.png' },
+      { symbol: 'SBUX', name: 'Starbucks Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/SBUX.png' },
+      { symbol: 'QCOM', name: 'QUALCOMM Incorporated', logo: 'https://companiesmarketcap.com/img/company-logos/QCOM.png' },
+      { symbol: 'INTU', name: 'Intuit Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/INTU.png' },
+      { symbol: 'LRCX', name: 'Lam Research Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/LRCX.png' },
+      { symbol: 'TXN', name: 'Texas Instruments Incorporated', logo: 'https://companiesmarketcap.com/img/company-logos/TXN.png' },
+      { symbol: 'AMAT', name: 'Applied Materials, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/AMAT.png' },
+      { symbol: 'PLTR', name: 'Palantir Technologies Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/PLTR.png' },
+      { symbol: 'UBER', name: 'Uber Technologies, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/UBER.png' },
+      { symbol: 'SNAP', name: 'Snap Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/SNAP.png' },
+      { symbol: 'RIVN', name: 'Rivian Automotive, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/RIVN.png' },
+      { symbol: 'HOOD', name: 'Robinhood Markets, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/HOOD.png' },
+      { symbol: 'COIN', name: 'Coinbase Global, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/COIN.png' },
+      { symbol: 'PINS', name: 'Pinterest, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/PINS.png' },
+      { symbol: 'ZM', name: 'Zoom Video Communications, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/ZM.png' },
+      { symbol: 'SHOP', name: 'Shopify Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/SHOP.png' },
+      { symbol: 'SQ', name: 'Block, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/SQ.png' },
+      { symbol: 'DDOG', name: 'Datadog, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/DDOG.png' },
+      { symbol: 'CRWD', name: 'CrowdStrike Holdings, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/CRWD.png' },
+      { symbol: 'OKTA', name: 'Okta, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/OKTA.png' },
+      { symbol: 'UPST', name: 'Upstart Holdings, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/UPST.png' },
+      { symbol: 'FSLY', name: 'Fastly, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/FSLY.png' },
+      { symbol: 'TDOC', name: 'Teladoc Health, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/TDOC.png' },
+      { symbol: 'ROKU', name: 'Roku, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/ROKU.png' },
+      { symbol: 'CHPT', name: 'ChargePoint Holdings, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/CHPT.png' },
+      { symbol: 'CLOV', name: 'Clover Health Investments, Corp.', logo: 'https://companiesmarketcap.com/img/company-logos/CLOV.png' },
+      { symbol: 'GME', name: 'GameStop Corp.', logo: 'https://companiesmarketcap.com/img/company-logos/GME.png' },
+      { symbol: 'AMC', name: 'AMC Entertainment Holdings, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/AMC.png' },
+      { symbol: 'SPG', name: 'Simon Property Group, Inc.', logo: 'https://companiesmarketcap.com/img/company-logos/SPG.png' },
+      { symbol: 'O', name: 'Realty Income Corporation', logo: 'https://companiesmarketcap.com/img/company-logos/O.png' },
+      { symbol: 'VTI', name: 'Vanguard Total Stock Market Index Fund ETF', logo: 'https://companiesmarketcap.com/img/company-logos/VTI.png' },
+      { symbol: 'VOO', name: 'Vanguard S&P 500 ETF', logo: 'https://companiesmarketcap.com/img/company-logos/VOO.png' },
+      { symbol: 'QQQ', name: 'Invesco QQQ Trust (NASDAQ 100)', logo: 'https://companiesmarketcap.com/img/company-logos/QQQ.png' },
+      { symbol: 'DIA', name: 'SPDR Dow Jones Industrial Average ETF Trust', logo: 'https://companiesmarketcap.com/img/company-logos/DIA.png' },
+      { symbol: 'ARKK', name: 'ARK Innovation ETF', logo: 'https://companiesmarketcap.com/img/company-logos/ARKK.png' },
+      { symbol: 'XLK', name: 'Technology Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLK.png' },
+      { symbol: 'XLF', name: 'Financial Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLF.png' },
+      { symbol: 'XLE', name: 'Energy Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLE.png' },
+      { symbol: 'XLP', name: 'Consumer Staples Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLP.png' },
+      { symbol: 'XLY', name: 'Consumer Discretionary Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLY.png' },
+      { symbol: 'XLV', name: 'Health Care Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLV.png' },
+      { symbol: 'XLI', name: 'Industrial Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLI.png' },
+      { symbol: 'XLU', name: 'Utilities Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLU.png' },
+      { symbol: 'XLB', name: 'Materials Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLB.png' },
+      { symbol: 'XLC', name: 'Communication Services Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLC.png' },
+      { symbol: 'XLRE', name: 'Real Estate Select Sector SPDR Fund', logo: 'https://companiesmarketcap.com/img/company-logos/XLRE.png' },
+      { symbol: 'GLD', name: 'SPDR Gold Shares', logo: 'https://companiesmarketcap.com/img/company-logos/GLD.png' },
+      { symbol: 'SLV', name: 'iShares Silver Trust', logo: 'https://companiesmarketcap.com/img/company-logos/SLV.png' },
+      { symbol: 'USO', name: 'United States Oil Fund, LP', logo: 'https://companiesmarketcap.com/img/company-logos/USO.png' },
+      { symbol: 'BND', name: 'Vanguard Total Bond Market Index Fund ETF', logo: 'https://companiesmarketcap.com/img/company-logos/BND.png' },
+      { symbol: 'AGG', name: 'iShares Core U.S. Aggregate Bond ETF', logo: 'https://companiesmarketcap.com/img/company-logos/AGG.png' },
+      { symbol: 'TLT', name: 'iShares 20+ Year Treasury Bond ETF', logo: 'https://companiesmarketcap.com/img/company-logos/TLT.png' },
+    ];
+
+    const popularCryptos = [
+        { symbol: 'BTC', name: 'Bitcoin', cmc_id: '1', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/1.png', basePrice: 104297.65, dailyVolatility: 0.025, avgChange24h: -0.55 }, 
+        { symbol: 'ETH', name: 'Ethereum', cmc_id: '1027', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png', basePrice: 2502.33, dailyVolatility: 0.035, avgChange24h: 0.77 },
+        { symbol: 'SOL', name: 'Solana', cmc_id: '5426', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/5426.png', basePrice: 143.70, dailyVolatility: 0.04, avgChange24h: -1.13 },
+        { symbol: 'XRP', name: 'XRP', cmc_id: '52', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/52.png', basePrice: 0.50, dailyVolatility: 0.02, avgChange24h: -0.8 }, 
+        { symbol: 'DOGE', name: 'Dogecoin', cmc_id: '74', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/74.png', basePrice: 0.17, dailyVolatility: 0.05, avgChange24h: 1.72 },
+        { symbol: 'ADA', name: 'Cardano', cmc_id: '2010', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/2010.png', basePrice: 0.60, dailyVolatility: 0.03, avgChange24h: -1.34 },
+        { symbol: 'AVAX', name: 'Avalanche', cmc_id: '5805', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png', basePrice: 19.17, dailyVolatility: 0.04, avgChange24h: -2.87 },
+        { symbol: 'DOT', name: 'Polkadot', cmc_id: '6636', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/6636.png', basePrice: 3.55, dailyVolatility: 0.03, avgChange24h: -1.00 },
+        { symbol: 'LINK', name: 'Chainlink', cmc_id: '1975', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/1975.png', basePrice: 13.03, dailyVolatility: 0.03, avgChange24h: 0.92 },
+        { symbol: 'LTC', name: 'Litecoin', cmc_id: '2', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/2.png', basePrice: 85.61, dailyVolatility: 0.03, avgChange24h: 1.38 },
+        { symbol: 'BCH', name: 'Bitcoin Cash', cmc_id: '1831', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/1831.png', basePrice: 486.59, dailyVolatility: 0.04, avgChange24h: 4.42 },
+        { symbol: 'XLM', name: 'Stellar', cmc_id: '512', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/512.png', basePrice: 0.25, dailyVolatility: 0.03, avgChange24h: -0.36 },
+        { symbol: 'TRX', name: 'Tron', cmc_id: '1958', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/1958.png', basePrice: 0.12, dailyVolatility: 0.03, avgChange24h: 0.90 }, 
+        { symbol: 'UNI', name: 'Uniswap', cmc_id: '7083', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/7083.png', basePrice: 8.00, dailyVolatility: 0.05, avgChange24h: 1.8 },
+        { symbol: 'ICP', name: 'Internet Computer', cmc_id: '8916', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/8916.png', basePrice: 5.03, dailyVolatility: 0.06, avgChange24h: -0.16 },
+        { symbol: 'ETC', name: 'Ethereum Classic', cmc_id: '1321', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/1321.png', basePrice: 16.68, dailyVolatility: 0.04, avgChange24h: 0.06 },
+        { symbol: 'VET', name: 'VeChain', cmc_id: '3077', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/3077.png', basePrice: 0.03, dailyVolatility: 0.04, avgChange24h: -0.7 },
+        { symbol: 'FIL', name: 'Filecoin', cmc_id: '6937', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/6937.png', basePrice: 2.37, dailyVolatility: 0.05, avgChange24h: -0.69 },
+        { symbol: 'ATOM', name: 'Cosmos', cmc_id: '3794', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/3794.png', basePrice: 4.01, dailyVolatility: 0.04, avgChange24h: 0.97 },
+        { symbol: 'NEAR', name: 'NEAR Protocol', cmc_id: '6535', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/6535.png', basePrice: 2.18, dailyVolatility: 0.05, avgChange24h: 2.49 },
+        { symbol: 'APT', name: 'Aptos', cmc_id: '21794', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/21794.png', basePrice: 4.37, dailyVolatility: 0.06, avgChange24h: 0.73 },
+        { symbol: 'OP', name: 'Optimism', cmc_id: '18897', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/18897.png', basePrice: 0.559, dailyVolatility: 0.05, avgChange24h: -0.81 },
+        { symbol: 'ARB', name: 'Arbitrum', cmc_id: '11841', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png', basePrice: 0.80, dailyVolatility: 0.05, avgChange24h: 1.70 },
+        { symbol: 'INJ', name: 'Injective', cmc_id: '5857', logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/5857.png', basePrice: 11.38, dailyVolatility: 0.06, avgChange24h: 4.77 },
+    ];
+
+    function filterSuggestions(query, type) {
+      if (!query) return [];
+      query = query.toLowerCase();
+      let assetsToFilter = [];
+
+      if (type === 'stocks') {
+        assetsToFilter = popularStocks;
+      } else if (type === 'crypto') {
+        assetsToFilter = popularCryptos;
+      } else {
+        assetsToFilter = [
+          ...popularStocks,
+          ...popularCryptos.map(c => ({ symbol: c.symbol, name: `${c.name} (Crypto)` }))
+        ];
+      }
+
+      const filtered = assetsToFilter.filter(
+        (asset) =>
+          asset.symbol.toLowerCase().startsWith(query) ||
+          asset.name.toLowerCase().includes(query)
+      );
+      return filtered.slice(0, 10);
+    }
+
+    let currentStockSuggestionIndex = -1;
+    let currentCryptoSuggestionIndex = -1;
+
+    stockInput.addEventListener('input', () => {
+      const query = stockInput.value.trim().toUpperCase();
+      getStockBtn.disabled = query.length === 0;
+
+      const matches = filterSuggestions(query, 'stocks');
+      stockSuggestionsList.innerHTML = '';
+
+      if (matches.length > 0 && query.length > 0) {
+        stockSuggestionsList.hidden = false;
+        stockSuggestionsList.setAttribute('aria-expanded', 'true');
+        currentStockSuggestionIndex = -1;
+
+        matches.forEach((stock, index) => {
+          const li = createSuggestionItem(stock.symbol, stock.name, index, 'stock');
+          stockSuggestionsList.appendChild(li);
+        });
+      } else {
+        stockSuggestionsList.hidden = true;
+        stockSuggestionsList.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    stockInput.addEventListener('keydown', (e) => {
+      handleSuggestionKeydown(e, stockInput, stockSuggestionsList, getStockBtn, 'stock', 'stock');
+    });
+
+    getStockBtn.addEventListener('click', () => {
+      const symbol = stockInput.value.trim().toUpperCase();
+      if (symbol.length > 0) {
+        fetchStock(symbol);
+      }
+    });
+
+    cryptoInput.addEventListener('input', () => {
+      const query = cryptoInput.value.trim().toUpperCase();
+      getCryptoBtn.disabled = query.length === 0;
+
+      const matches = filterSuggestions(query, 'crypto');
+      cryptoSuggestionsList.innerHTML = '';
+
+      if (matches.length > 0 && query.length > 0) {
+        cryptoSuggestionsList.hidden = false;
+        cryptoSuggestionsList.setAttribute('aria-expanded', 'true');
+        currentCryptoSuggestionIndex = -1;
+
+        matches.forEach((crypto, index) => {
+          const li = createSuggestionItem(crypto.symbol, crypto.name, index, 'crypto');
+          cryptoSuggestionsList.appendChild(li);
+        });
+      } else {
+        cryptoSuggestionsList.hidden = true;
+        cryptoSuggestionsList.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    cryptoInput.addEventListener('keydown', (e) => {
+      handleSuggestionKeydown(e, cryptoInput, cryptoSuggestionsList, getCryptoBtn, 'crypto', 'crypto');
+    });
+
+    getCryptoBtn.addEventListener('click', () => {
+      const symbol = cryptoInput.value.trim().toUpperCase();
+      if (symbol.length > 0) {
+        fetchCrypto(symbol);
+      }
+    });
+
+    function createSuggestionItem(symbol, name, index, type) {
+        const li = document.createElement('li');
+        li.textContent = `${symbol} — ${name}`;
+        li.classList.add('suggestion-item');
+        li.setAttribute('role', 'option');
+        li.setAttribute('id', `${type}-suggestion-${index}`);
+        li.tabIndex = -1;
+
+        li.addEventListener('click', () => {
+            const inputField = (type === 'stock' ? stockInput : cryptoInput);
+            const getButton = (type === 'stock' ? getStockBtn : getCryptoBtn);
+            const suggestionsEl = (type === 'stock' ? stockSuggestionsList : cryptoSuggestionsList);
+
+            inputField.value = symbol;
+            getButton.disabled = false;
+            suggestionsEl.hidden = true;
+            suggestionsEl.setAttribute('aria-expanded', 'false');
+            inputField.focus();
+            if (type === 'stock') {
+                fetchStock(symbol);
+            } else {
+                fetchCrypto(symbol);
+            }
+        });
+        return li;
+    }
+
+    function handleSuggestionKeydown(e, inputField, suggestionsListEl, getButton, currentType, suggestionType) {
+        const items = Array.from(suggestionsListEl.children);
+        if (items.length === 0) {
+            if (e.key === 'Enter' && !getButton.disabled) {
+                e.preventDefault();
+                getButton.click();
+            }
+            return;
+        }
+
+        let currentIndex = (suggestionType === 'stock') ? currentStockSuggestionIndex : currentCryptoSuggestionIndex;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            currentIndex = (currentIndex + 1) % items.length;
+            items[currentIndex].focus();
+            inputField.setAttribute('aria-activedescendant', `${suggestionType}-suggestion-${currentIndex}`);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            currentIndex = (currentIndex - 1 + items.length) % items.length;
+            items[currentIndex].focus();
+            inputField.setAttribute('aria-activedescendant', `${suggestionType}-suggestion-${currentIndex}`);
+        } else if (e.key === 'Enter') {
+            if (currentIndex > -1) {
+                e.preventDefault();
+                items[currentIndex].click();
+            } else if (!getButton.disabled) {
+                e.preventDefault();
+                getButton.click();
+            }
+        } else if (e.key === 'Escape') {
+            suggestionsListEl.hidden = true;
+            suggestionsListEl.setAttribute('aria-expanded', 'false');
+            inputField.focus();
+        }
+
+        if (suggestionType === 'stock') {
+            currentStockSuggestionIndex = currentIndex;
+        } else {
+            currentCryptoSuggestionIndex = currentIndex;
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.suggestions') && !stockSuggestionsList.hidden) {
+        stockSuggestionsList.hidden = true;
+        stockSuggestionsList.setAttribute('aria-expanded', 'false');
+      }
+      if (!e.target.closest('.suggestions') && !cryptoSuggestionsList.hidden) {
+        cryptoSuggestionsList.hidden = true;
+        cryptoSuggestionsList.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    window.addEventListener('load', () => {
+      const initialHash = window.location.hash.substring(1); 
+      if (initialHash === 'stocks' || initialHash === 'crypto') {
+          showPage(initialHash);
+      } else {
+          showPage('stocks'); 
+      }
+      
+      if (localStorage.getItem('theme') === 'light') {
+        document.body.classList.add('light-mode');
+        themeToggle.textContent = '🌙';
+      } else {
+        themeToggle.textContent = '☀️';
+      }
+    });
+
+    window.addEventListener('hashchange', () => {
+        const hash = window.location.hash.substring(1);
+        if (hash === 'stocks' || hash === 'crypto') {
+            showPage(hash);
+        } else {
+            showPage('stocks'); 
+        }
+    });
+
+
+    function destroyChart(chartInstance) {
+        if (chartInstance) {
+            chartInstance.destroy();
+            chartInstance = null;
+        }
+    }
+
+    function renderChart(canvasId, title, labels, data, type = 'line') {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+
+        if (canvasId === 'stockChartCanvas' && stockChartInstance) {
+            stockChartInstance.destroy();
+            stockChartInstance = null;
+        } else if (canvasId === 'cryptoChartCanvas' && cryptoChartInstance) {
+            cryptoChartInstance.destroy();
+            cryptoChartInstance = null;
+        }
+        
+        const newChart = new Chart(ctx, {
+            type: type,
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: title,
+                    data: data,
+                    borderColor: getComputedStyle(document.body).getPropertyValue('--highlight-color'),
+                    backgroundColor: getComputedStyle(document.body).getPropertyValue('--highlight-color') + '22',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: getComputedStyle(document.body).getPropertyValue('--text-color')
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: getComputedStyle(document.body).getPropertyValue('--accent-color')
+                        },
+                        grid: {
+                            color: getComputedStyle(document.body).getPropertyValue('--chat-scrollbar-track')
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: getComputedStyle(document.body).getPropertyValue('--accent-color')
+                        },
+                        grid: {
+                            color: getComputedStyle(document.body).getPropertyValue('--chat-scrollbar-track')
+                        }
+                    }
+                }
+            }
+        });
+
+        if (canvasId === 'stockChartCanvas') {
+            stockChartInstance = newChart;
+        } else {
+            cryptoChartInstance = newChart;
+        }
+    }
+
+    async function fetchStock(symbol) {
+      stockInfo.innerHTML = `<p>Loading data for <strong>${symbol}</strong> from Finnhub...</p>`;
+      try {
+        const quoteResponse = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`);
+        if (!quoteResponse.ok) {
+          if (quoteResponse.status === 429) {
+            stockInfo.innerHTML = `<p class="disclaimer"><em>Finnhub API rate limit exceeded. Please wait a minute or try again.</em></p>`;
+            throw new Error('Finnhub API rate limit exceeded.');
+          }
+          throw new Error(`Finnhub API error: ${quoteResponse.statusText}. Check console for details.`);
+        }
+        const data = await quoteResponse.json();
+
+        if (!data || data.c === 0) {
+          stockInfo.innerHTML = `<p>Symbol not found or no data available for "<strong>${symbol}</strong>". Please check the symbol and try again.</p>`;
+          stockChartTitle.textContent = `Stock Price Chart (No Data)`;
+          document.querySelector('#stock-graph-section .graph-placeholder p').textContent = 'No real-time data found for this stock. Try another symbol.';
+          destroyChart(stockChartInstance);
+          return;
+        }
+
+        let companyName = symbol.toUpperCase();
+        let companyLogo = '';
+        const foundStock = popularStocks.find(s => s.symbol === symbol);
+        if (foundStock) {
+            companyName = foundStock.name;
+            companyLogo = foundStock.logo;
+        }
+
+        const change = data.c - data.pc;
+        const changePercent = (change / data.pc) * 100;
+        const changeClass = change > 0 ? 'text-green' : change < 0 ? 'text-red' : '';
+
+        stockInfo.innerHTML = `
+          <h2>
+            ${companyLogo ? `<img src="${companyLogo}" alt="${companyName} Logo">` : ''}
+            ${symbol.toUpperCase()} - ${companyName}
+          </h2>
+          <p><strong>Current Price:</strong> <span class="${changeClass}">$${data.c.toFixed(2)}</span></p>
+          <p><strong>Daily Change:</strong> <span class="${changeClass}">${change.toFixed(2)} (${changePercent.toFixed(2)}%)</span></p>
+          <p><strong>Open Price:</strong> $${data.o.toFixed(2)}</p>
+          <p><strong>High Price (Today):</strong> $${data.h.toFixed(2)}</p>
+          <p><strong>Low Price (Today):</strong> $${data.l.toFixed(2)}</p>
+          <p><strong>Previous Close:</strong> $${data.pc.toFixed(2)}</p>
+          <p class="disclaimer"><em>Data provided by Finnhub.io. Prices are near real-time.</em></p>
+        `;
+
+        const endDate = Math.floor(Date.now() / 1000);
+        const startDate = endDate - (90 * 24 * 60 * 60); 
+
+        try {
+            const candleResponse = await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${startDate}&to=${endDate}&token=${FINNHUB_API_KEY}`);
+            if (!candleResponse.ok) {
+                const errorText = await candleResponse.text();
+                if (candleResponse.status === 403 || errorText.includes("You don't have access to this resource") || errorText.includes("Invalid API key or token.")) {
+                    throw new Error(`Finnhub historical data is limited on free tier for ${symbol}. This symbol or historical data might require a premium plan.`);
+                }
+                throw new Error(`Failed to fetch historical data for chart (${candleResponse.status}): ${errorText || candleResponse.statusText}.`);
+            }
+            const candleData = await candleResponse.json();
+
+            if (candleData && candleData.s === 'ok' && candleData.c && candleData.t && candleData.c.length > 1) {
+                const labels = candleData.t.map(timestamp => {
+                    const date = new Date(timestamp * 1000);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                });
+                const dataValues = candleData.c;
+
+                stockChartTitle.textContent = `${companyName} (${symbol.toUpperCase()}) - Price Chart`;
+                renderChart('stockChartCanvas', `${symbol.toUpperCase()} Price`, labels, dataValues);
+                document.querySelector('#stock-graph-section .graph-placeholder p').textContent = 'Chart showing daily closing prices for the last 90 days.';
+            } else {
+                throw new Error('Finnhub historical data unavailable or insufficient for charting. Displaying simulated data.');
+            }
+        } catch (chartError) {
+            console.warn(`Falling back to simulated stock chart for ${symbol}:`, chartError.message);
+            const simulatedLabels = [];
+            const simulatedData = [];
+            let currentSimulatedPrice = data.c;
+            const volatility = 0.02;
+
+            for (let i = 0; i < 30; i++) {
+                const date = new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000);
+                simulatedLabels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                simulatedData.push(currentSimulatedPrice);
+                currentSimulatedPrice *= (1 + (Math.random() - 0.5) * volatility); 
+            }
+
+            stockChartTitle.textContent = `${companyName} (${symbol.toUpperCase()}) - Price Chart (Simulated)`;
+            renderChart('stockChartCanvas', `${symbol.toUpperCase()} Price`, simulatedLabels, simulatedData);
+            document.querySelector('#stock-graph-section .graph-placeholder p').textContent = `*Chart is simulated: ${chartError.message}*`;
+        }
+
+      } catch (error) {
+        stockInfo.innerHTML = `
+          <h2>Error for ${symbol.toUpperCase()}</h2>
+          <p>Error fetching stock data: <em>${error.message}.</em> Please try again later.</p>
+        `;
+        stockChartTitle.textContent = `Stock Price Chart (Error)`;
+        document.querySelector('#stock-graph-section .graph-placeholder p').textContent = `Failed to load chart for ${symbol.toUpperCase()}. ${error.message}`;
+        destroyChart(stockChartInstance);
+        console.error("Fetch stock error:", error);
+      }
+    }
+
+    async function fetchCrypto(symbol) {
+        cryptoInfo.innerHTML = `<p>Loading data for <strong>${symbol}</strong> from CoinMarketCap...</p>`;
+        
+        const cryptoDetails = popularCryptos.find(c => c.symbol === symbol);
+
+        if (!cryptoDetails || !cryptoDetails.cmc_id) {
+            cryptoInfo.innerHTML = `<p>Cryptocurrency "<strong>${symbol}</strong>" not found or CoinMarketCap ID missing from list.</p>`;
+            cryptoChartTitle.textContent = `Cryptocurrency Price Chart (No Data)`;
+            document.querySelector('#crypto-graph-section .graph-placeholder p').textContent = 'No data available for this crypto. Try another symbol.';
+            destroyChart(cryptoChartInstance);
+            return;
+        }
+
+        try {
+            const cmcResponse = await fetch(`https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=${symbol}&convert=USD`, {
+                headers: {
+                    'X-CMC_PRO_API_KEY': COINMARKETCAP_API_KEY
+                }
+            });
+
+            if (!cmcResponse.ok) {
+                const errorData = await cmcResponse.json();
+                if (cmcResponse.status === 401) {
+                    throw new Error(`CoinMarketCap API Key invalid or expired.`);
+                }
+                if (cmcResponse.status === 429) {
+                    throw new Error('CoinMarketCap API rate limit exceeded. Please wait a minute or try again later.');
+                }
+                throw new Error(`CoinMarketCap API error: ${cmcResponse.status} - ${errorData.status.error_message || cmcResponse.statusText}.`);
+            }
+
+            const cmcData = await cmcResponse.json();
+            const currencyData = cmcData.data[symbol];
+
+            if (currencyData && currencyData.quote && currencyData.quote.USD) {
+                const currentPrice = currencyData.quote.USD.price;
+                const percentChange24h = currencyData.quote.USD.percent_change_24h;
+                const lastUpdated = new Date(currencyData.quote.USD.last_updated).toLocaleTimeString();
+
+                const changeVal = (currentPrice * percentChange24h) / 100;
+                const changeClass = percentChange24h > 0 ? 'text-green' : percentChange24h < 0 ? 'text-red' : '';
+                const prevClose = currentPrice - changeVal;
+
+                cryptoInfo.innerHTML = `
+                    <h2>
+                        ${cryptoDetails.logo ? `<img src="${cryptoDetails.logo}" alt="${cryptoDetails.name} Logo">` : ''}
+                        ${symbol} - ${currencyData.name}
+                    </h2>
+                    <p><strong>Current Price:</strong> <span class="${changeClass}">$${currentPrice.toFixed(2)}</span></p>
+                    <p><strong>Daily Change:</strong> <span class="${changeClass}">${percentChange24h.toFixed(2)}% (${changeVal.toFixed(2)})</span></p>
+                    <p><strong>Last Updated:</strong> ${lastUpdated}</p>
+                    <p class="disclaimer"><em>Data from CoinMarketCap. Prices are highly volatile.</em></p>
+                `;
+
+                const simulatedLabels = [];
+                const simulatedData = [];
+                let simulatedCurrentPrice = currentPrice;
+                const volatility = 0.03;
+
+                for (let i = 0; i < 30; i++) {
+                    const date = new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000);
+                    simulatedLabels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                    simulatedCurrentPrice *= (1 + (Math.random() - 0.5) * volatility);
+                    simulatedData.push(simulatedCurrentPrice);
+                }
+                
+                cryptoChartTitle.textContent = `${currencyData.name} (${symbol.toUpperCase()}) - Price Chart (Simulated)`;
+                renderChart('cryptoChartCanvas', `${symbol.toUpperCase()} Price`, simulatedLabels, simulatedData);
+                document.querySelector('#crypto-graph-section .graph-placeholder p').textContent = '*Chart is simulated: CoinMarketCap free tier does not provide historical data.*';
+
+            } else {
+                 throw new Error('No detailed crypto data available from CoinMarketCap for this symbol.');
+            }
+
+        } catch (error) {
+            let displayPrice = cryptoDetails.basePrice || 'N/A';
+            let displayChange = cryptoDetails.avgChange24h ? `${cryptoDetails.avgChange24h}%` : 'N/A';
+            let displayChangeVal = (cryptoDetails.basePrice * cryptoDetails.avgChange24h / 100).toFixed(2);
+            let displayPrevClose = (cryptoDetails.basePrice - (cryptoDetails.basePrice * cryptoDetails.avgChange24h / 100)).toFixed(2);
+            let cryptoName = cryptoDetails.name || symbol;
+            let changeClass = (cryptoDetails.avgChange24h > 0) ? 'text-green' : (cryptoDetails.avgChange24h < 0) ? 'text-red' : '';
+
+            cryptoInfo.innerHTML = `
+                <h2>
+                    ${cryptoDetails.logo ? `<img src="${cryptoDetails.logo}" alt="${cryptoName} Logo">` : ''}
+                    ${symbol} - ${cryptoName}
+                </h2>
+                <p><strong>Current Price (Est.):</strong> <span class="${changeClass}">$${parseFloat(displayPrice).toLocaleString()}</span></p>
+                <p><strong>Daily Change (Est.):</strong> <span class="${changeClass}">${displayChange} (${displayChangeVal})</span></p>
+                <p><strong>Previous Close (Est.):</strong> $${displayPrevClose}</p>
+                <p class="disclaimer"><em>Crypto prices are estimated (internal averages) due to API issues or limitations.</em></p>
+                <p class="disclaimer">API Error: ${error.message}</p>
+            `;
+            console.error("Crypto fetch error, falling back to estimates:", error);
+            
+            const simulatedLabels = [];
+            const simulatedData = [];
+            let simulatedCurrentPrice = parseFloat(displayPrice);
+            const volatility = cryptoDetails.dailyVolatility || 0.03;
+
+            for (let i = 0; i < 30; i++) {
+                const date = new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000);
+                simulatedLabels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                simulatedCurrentPrice *= (1 + (Math.random() - 0.5) * volatility);
+                simulatedData.push(simulatedCurrentPrice);
+            }
+            cryptoChartTitle.textContent = `${cryptoName} (${symbol.toUpperCase()}) - Price Chart (Simulated)`;
+            document.querySelector('#crypto-graph-section .graph-placeholder p').textContent = `*Chart is simulated: ${error.message || 'API request failed'}.*`;
+            renderChart('cryptoChartCanvas', `${symbol.toUpperCase()} Price`, simulatedLabels, simulatedData);
+        }
+    }
+
+    let isChatWidgetVisible = true;
+    let isDragging = false;
+    let offsetX, offsetY;
+
+    aiChatToggle.addEventListener('click', () => {
+      isChatWidgetVisible = !isChatWidgetVisible;
+      aiChatWidget.classList.toggle('hidden', !isChatWidgetVisible);
+      aiChatToggle.setAttribute('aria-expanded', isChatWidgetVisible);
+      aiChatToggle.textContent = 'AI';
+      if (isChatWidgetVisible) {
+          aiChatToggle.style.animation = 'none';
+      } else {
+          aiChatToggle.style.animation = 'pulse 2s infinite';
+      }
+    });
+
+    aiChatHeader.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      aiChatHeader.style.cursor = 'grabbing';
+      offsetX = e.clientX - aiChatWidget.getBoundingClientRect().left;
+      offsetY = e.clientY - aiChatWidget.getBoundingClientRect().top;
+      aiChatWidget.style.transition = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      let newLeft = e.clientX - offsetX;
+      let newTop = e.clientY - offsetY;
+
+      const widgetRect = aiChatWidget.getBoundingClientRect();
+      const maxX = window.innerWidth - widgetRect.width;
+      const maxY = window.innerHeight - widgetRect.height;
+
+      newLeft = Math.max(0, Math.min(newLeft, maxX));
+      newTop = Math.max(0, Math.min(newTop, maxY));
+
+      aiChatWidget.style.left = `${newLeft}px`;
+      aiChatWidget.style.top = `${newTop}px`;
+      aiChatWidget.style.right = 'auto';
+      aiChatWidget.style.bottom = 'auto';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        aiChatHeader.style.cursor = 'grab';
+        aiChatWidget.style.transition = 'transform 0.3s ease, opacity 0.3s ease, background 0.3s ease, box-shadow 0.3s ease';
+      }
+    });
+
+    function addChatMessage(text, sender = 'bot') {
+      const messageDiv = document.createElement('div');
+      messageDiv.classList.add('chat-message');
+      if (sender === 'user') messageDiv.classList.add('user');
+
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.textContent = sender === 'user' ? 'You' : 'AI';
+
+      const messageText = document.createElement('div');
+      messageText.className = 'message-text';
+      messageText.innerHTML = parseMarkdown(text);
+
+      messageDiv.appendChild(avatar);
+      messageDiv.appendChild(messageText);
+      aiChatLog.appendChild(messageDiv);
+
+      aiChatLog.scrollTop = aiChatLog.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+      const typingDiv = document.createElement('div');
+      typingDiv.classList.add('typing-indicator');
+      typingDiv.setAttribute('aria-label', 'AI is typing');
+      typingDiv.innerHTML = `AI is typing <span></span><span></span><span></span>`;
+      aiChatLog.appendChild(typingDiv);
+      aiChatLog.scrollTop = aiChatLog.scrollHeight;
+      return typingDiv;
+    }
+
+    function hideTypingIndicator(indicatorElement) {
+      if (indicatorElement && indicatorElement.parentNode) {
+        indicatorElement.parentNode.removeChild(indicatorElement);
+      }
+    }
+
+    function parseMarkdown(text) {
+        text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        text = text.replace(/^- (.*)/gm, '<li>$1</li>');
+        if (text.includes('<li>') && !text.includes('<ul>')) {
+            text = `<ul>${text}</ul>`;
+        }
+        return text;
+    }
+
+    async function generateAIResponse(userText) {
+      const lowerCaseText = userText.toLowerCase();
+      let botReply = "I'm still learning. For specific stock or crypto prices, please use the search bar above. Try asking about general market trends or investment basics!";
+      let currentResponseCategory = 'default';
+      let assetFound = null;
+
+      const userTextWithoutPunctuation = lowerCaseText.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?\s]/g,"").replace(/\s/g,"");
+
+      for (const stock of popularStocks) {
+          const stockSymbolCleaned = stock.symbol.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?\s]/g,"").replace(/\s/g,"");
+          if (userTextWithoutPunctuation.includes(stockSymbolCleaned)) {
+              assetFound = { type: 'stock', symbol: stock.symbol };
+              break;
+          }
+      }
+      if (!assetFound) {
+          for (const crypto of popularCryptos) {
+              const cryptoSymbolCleaned = crypto.symbol.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?\s]/g,"").replace(/\s/g,"");
+              if (userTextWithoutPunctuation.includes(cryptoSymbolCleaned)) {
+                  assetFound = { type: 'crypto', symbol: crypto.symbol };
+                  break;
+              }
+          }
+      }
+
+      if (lastUserQuery && userTextWithoutPunctuation === lastUserQuery.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?\s]/g,"").replace(/\s/g,"")) {
+          botReply = "You just asked that! Is there something new I can help you with?";
+          currentResponseCategory = 'repetition';
+      } else if (assetFound) {
+          if (assetFound.symbol === lastAssetSymbolMentioned && currentResponseCategory.includes('price')) {
+              botReply = `You recently asked about **${assetFound.symbol.toUpperCase()}**. Would you like to know more about it, or maybe a different asset?`;
+              currentResponseCategory = 'asset_repetition';
+          } else {
+              const indicator = showTypingIndicator();
+              if (assetFound.type === 'stock') {
+                  try {
+                      const quoteResponse = await fetch(`https://finnhub.io/api/v1/quote?symbol=${assetFound.symbol}&token=${FINNHUB_API_KEY}`);
+                      if (!quoteResponse.ok) throw new Error('Failed to fetch stock data.');
+                      const data = await quoteResponse.json();
+
+                      hideTypingIndicator(indicator);
+
+                      if (data && data.c !== 0) {
+                          let companyName = popularStocks.find(s => s.symbol === assetFound.symbol)?.name || assetFound.symbol.toUpperCase();
+
+                          botReply = `The current price for **${companyName} (${assetFound.symbol.toUpperCase()})** is **$${data.c.toFixed(2)}**. It closed at $${data.pc.toFixed(2)} yesterday.`;
+                          currentResponseCategory = 'stock_price';
+                          lastAssetSymbolMentioned = assetFound.symbol;
+                      } else {
+                          botReply = `I couldn't find real-time data for **${assetFound.symbol.toUpperCase()}**. Please try the search bar for more accurate results.`;
+                          currentResponseCategory = 'stock_not_found';
+                          lastAssetSymbolMentioned = assetFound.symbol;
+                      }
+                  } catch (error) {
+                      hideTypingIndicator(indicator);
+                      console.error("AI chat stock fetch error:", error);
+                      botReply = `Sorry, I encountered an error fetching real-time data for **${assetFound.symbol.toUpperCase()}**. ${error.message}`;
+                      currentResponseCategory = 'api_error';
+                      lastAssetSymbolMentioned = assetFound.symbol;
+                  }
+              } else if (assetFound.type === 'crypto') {
+                  const cryptoDetailsForCMC = popularCryptos.find(c => c.symbol === assetFound.symbol);
+                  if (!cryptoDetailsForCMC || !cryptoDetailsForCMC.cmc_id) {
+                      hideTypingIndicator(indicator);
+                      botReply = `I don't have CoinMarketCap ID for **${assetFound.symbol.toUpperCase()}** to fetch live data.`;
+                      currentResponseCategory = 'crypto_not_found';
+                      lastAssetSymbolMentioned = assetFound.symbol;
+                      return;
+                  }
+
+                  try {
+                      const cmcResponse = await fetch(`https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=${assetFound.symbol}&convert=USD`, {
+                          headers: {
+                              'X-CMC_PRO_API_KEY': COINMARKETCAP_API_KEY
+                          }
+                      });
+
+                      if (!cmcResponse.ok) {
+                           const errorData = await cmcResponse.json();
+                           if (cmcResponse.status === 401) {
+                                throw new Error(`CoinMarketCap API Key invalid or expired.`);
+                            }
+                           if (cmcResponse.status === 429) {
+                                throw new Error('CoinMarketCap API rate limit exceeded.');
+                            }
+                            throw new Error(`CoinMarketCap API error: ${cmcResponse.status} - ${errorData.status.error_message || cmcResponse.statusText}.`);
+                      }
+                      const cmcData = await cmcResponse.json();
+                      const currencyData = cmcData.data[assetFound.symbol];
+                      
+                      hideTypingIndicator(indicator);
+
+                      if (currencyData && currencyData.quote && currencyData.quote.USD) {
+                          const currentPrice = currencyData.quote.USD.price;
+                          const percentChange24h = currencyData.quote.USD.percent_change_24h;
+                          const changeVal = (currentPrice * percentChange24h) / 100;
+                          const cryptoName = popularCryptos.find(c => c.symbol === assetFound.symbol)?.name || assetFound.symbol;
+
+                          botReply = `The current price for **${cryptoName} (${assetFound.symbol.toUpperCase()})** is approximately **$${currentPrice.toFixed(2)}**. It experienced a daily change of ${percentChange24h.toFixed(2)}% (${changeVal.toFixed(2)}). Remember, cryptocurrency prices are highly volatile!`;
+                          currentResponseCategory = 'crypto_price';
+                          lastAssetSymbolMentioned = assetFound.symbol;
+                      } else {
+                          throw new Error('No detailed crypto data available from CoinMarketCap for this symbol.');
+                      }
+
+                  } catch (error) {
+                      hideTypingIndicator(indicator);
+                      console.error("AI chat crypto fetch error:", error);
+                      // Fallback to average/mock data for AI if API fails
+                      const cryptoEstData = popularCryptos.find(c => c.symbol === assetFound.symbol);
+                      let estPrice = cryptoEstData ? cryptoEstData.basePrice.toLocaleString() : 'N/A';
+                      let estChange = cryptoEstData ? cryptoEstData.avgChange24h : 'N/A';
+                      botReply = `Sorry, I encountered an error fetching real-time data for **${assetFound.symbol.toUpperCase()}**. ${error.message}. Based on our estimates, its price is around **$${estPrice}** with a daily change of **${estChange}%**.`;
+                      currentResponseCategory = 'api_error';
+                      lastAssetSymbolMentioned = assetFound.symbol;
+                  }
+              }
+          }
+      } else if (lowerCaseText.includes('hello') || lowerCaseText.includes('hi')) {
+        botReply = "Hello! I'm your StockWise AI assistant. How can I help you today with stocks, crypto, or investing?";
+        currentResponseCategory = 'greeting';
+      } else if (lowerCaseText.includes('help')) {
+        botReply = "I can answer general questions about stocks, cryptocurrencies, and investing. For specific prices, use the search bar above. You can ask me things like:\n- *What is diversification?*\n- *Explain inflation.*\n- *What are blue-chip stocks?*\n- *What are NFTs?*";
+        currentResponseCategory = 'help';
+      } else if (lowerCaseText.includes('buy') || lowerCaseText.includes('invest') || lowerCaseText.includes('should i')) {
+        botReply = "I'm an AI and cannot provide financial advice. **Investing involves risks**, and it's essential to do your own research or consult with a qualified financial advisor before making any investment decisions. I can explain concepts if you like!";
+        currentResponseCategory = 'financial_advice_disclaimer';
+      } else if (lowerCaseText.includes('stock') || lowerCaseText.includes('price') || lowerCaseText.includes('value') || lowerCaseText.includes('crypto')) {
+        botReply = "To get current stock or crypto prices, please type the symbol (e.g., **AAPL**, **BTC**) into the search box at the top and click 'Get Info'.";
+        currentResponseCategory = 'asset_price_instruction';
+      } else if (lowerCaseText.includes('tesla')) {
+        botReply = "Tesla (TSLA) is an American automotive and clean energy company known for electric vehicles and battery products.";
+        currentResponseCategory = 'company_info';
+      } else if (lowerCaseText.includes('apple')) {
+        botReply = "Apple Inc. (AAPL) is a multinational technology company famous for iPhones, Macs, and online services.";
+        currentResponseCategory = 'company_info';
+      } else if (lowerCaseText.includes('bitcoin') || lowerCaseText.includes('btc')) {
+        botReply = "Bitcoin (BTC) is the first decentralized cryptocurrency, enabling peer-to-peer transactions without intermediaries.";
+        currentResponseCategory = 'crypto_info';
+      } else if (lowerCaseText.includes('ethereum') || lowerCaseText.includes('eth')) {
+        botReply = "Ethereum (ETH) is a blockchain platform famous for smart contracts and decentralized applications (dApps).";
+        currentResponseCategory = 'crypto_info';
+      } else if (lowerCaseText.includes('diversification')) {
+        botReply = "<strong>Diversification</strong> is a strategy that mixes a wide variety of investments within a portfolio. The rationale behind this technique is to minimize the risk by investing in a variety of assets.";
+        currentResponseCategory = 'concept';
+      } else if (lowerCaseText.includes('inflation')) {
+        botReply = "<strong>Inflation</strong> is the rate at which the general level of prices for goods and services is rising, and, consequently, the purchasing power of currency is falling.";
+        currentResponseCategory = 'concept';
+      } else if (lowerCaseText.includes('blue-chip stocks')) {
+        botReply = "<strong>Blue-chip stocks</strong> are shares of large, well-established, and financially sound companies with a long history of reliable earnings and dividends. They are generally considered safer investments.";
+        currentResponseCategory = 'concept';
+      } else if (lowerCaseText.includes('etfs') || lowerCaseText.includes('what is etf')) {
+        botReply = "An **ETF (Exchange Traded Fund)** is a type of investment fund that trades on stock exchanges, much like a stock. ETFs hold assets such as stocks, commodities, or bonds, and generally, their prices fluctuate throughout the day as they are bought and sold.";
+        currentResponseCategory = 'concept';
+      } else if (lowerCaseText.includes('market index') || lowerCaseText.includes('sp500') || lowerCaseText.includes('nasdaq') || lowerCaseText.includes('dow jones')) {
+        botReply = "A **market index** represents the performance of a basket of securities and is used as a benchmark for investment performance. Examples include the S&P 500, NASDAQ Composite, and Dow Jones Industrial Average.";
+        currentResponseCategory = 'concept';
+      } else if (lowerCaseText.includes('nfts') || lowerCaseText.includes('what are nfts')) {
+        botReply = "An **NFT (Non-Fungible Token)** is a unique digital asset that represents ownership of real-world items like art, music, in-game items, and videos. They are stored on a blockchain.";
+        currentResponseCategory = 'concept';
+      } else if (lowerCaseText.includes('blockchain') || lowerCaseText.includes('what is blockchain')) {
+        botReply = "A **blockchain** is a decentralized, distributed ledger technology that underpins cryptocurrencies like Bitcoin. It records transactions across many computers so that the record cannot be altered retroactively.";
+        currentResponseCategory = 'concept';
+      } else if (lowerCaseText.includes('web3') || lowerCaseText.includes('what is web3')) {
+        botReply = "<strong>Web3</strong> is an idea for a new iteration of the World Wide Web based on blockchain technology, which incorporates concepts such as decentralization and token-based economics.";
+        currentResponseCategory = 'concept';
+      } else if (lowerCaseText.includes('thanks') || lowerCaseText.includes('thank you')) {
+        botReply = "You're most welcome! Is there anything else I can assist you with today?";
+        currentResponseCategory = 'thanks';
+      } else if (lowerCaseText.trim() === '') {
+        botReply = "Please type something so I can assist you.";
+        currentResponseCategory = 'empty_query';
+      } else if (currentResponseCategory === 'default' && lastBotResponseCategory === 'default') {
+          botReply = "I'm not sure how to respond to that. Could you please rephrase or ask a question about stocks, crypto, or investing?";
+          currentResponseCategory = 'fallback';
+      }
+
+      lastUserQuery = userText;
+      lastBotResponseCategory = currentResponseCategory;
+
+      addChatMessage(botReply, 'bot');
+    }
+
+    aiChatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userText = aiChatInput.value.trim();
+      if (!userText) return;
+
+      addChatMessage(userText, 'user');
+      aiChatInput.value = '';
+      aiChatSend.disabled = true;
+
+      const typingIndicatorElement = showTypingIndicator();
+
+      await new Promise(resolve => setTimeout(resolve, 900));
+
+      await generateAIResponse(userText);
+
+      hideTypingIndicator(typingIndicatorElement);
+      aiChatSend.disabled = false;
+      aiChatInput.focus();
+    });
+
+    aiChatInput.addEventListener('input', () => {
+      aiChatSend.disabled = aiChatInput.value.trim().length < 2;
+    });
+
+    themeToggle.addEventListener('click', () => {
+      document.body.classList.toggle('light-mode');
+      if (document.body.classList.contains('light-mode')) {
+        themeToggle.textContent = '🌙';
+        localStorage.setItem('theme', 'light');
+      } else {
+        themeToggle.textContent = '☀️';
+        localStorage.setItem('theme', 'dark');
+      }
+      if (stockChartInstance) {
+          stockChartInstance.options.scales.x.ticks.color = getComputedStyle(document.body).getPropertyValue('--accent-color');
+          stockChartInstance.options.scales.y.ticks.color = getComputedStyle(document.body).getPropertyValue('--accent-color');
+          stockChartInstance.options.scales.x.grid.color = getComputedStyle(document.body).getPropertyValue('--chat-scrollbar-track');
+          stockChartInstance.options.scales.y.grid.color = getComputedStyle(document.body).getPropertyValue('--chat-scrollbar-track');
+          stockChartInstance.options.plugins.legend.labels.color = getComputedStyle(document.body).getPropertyValue('--text-color');
+          stockChartInstance.update();
+      }
+      if (cryptoChartInstance) {
+          cryptoChartInstance.options.scales.x.ticks.color = getComputedStyle(document.body).getPropertyValue('--accent-color');
+          cryptoChartInstance.options.scales.y.ticks.color = getComputedStyle(document.body).getPropertyValue('--accent-color');
+          cryptoChartInstance.options.scales.x.grid.color = getComputedStyle(document.body).getPropertyValue('--chat-scrollbar-track');
+          cryptoChartInstance.options.scales.y.grid.color = getComputedStyle(document.body).getPropertyValue('--chat-scrollbar-track');
+          cryptoChartInstance.options.plugins.legend.labels.color = getComputedStyle(document.body).getPropertyValue('--text-color');
+          cryptoChartInstance.update();
+      }
+    });
+
+    function showPage(pageName) {
+        if (window.location.hash.substring(1) !== pageName) {
+            window.location.hash = pageName;
+        }
+
+        const allTabButtons = document.querySelectorAll('.tab-button');
+        allTabButtons.forEach(button => button.classList.remove('active'));
+
+        stocksPageContainer.classList.remove('active');
+        cryptoPageContainer.classList.remove('active');
+
+        if (pageName === 'stocks') {
+            stockTabButton.classList.add('active');
+            stocksPageContainer.classList.add('active');
+            stockInput.focus();
+            stockChartTitle.textContent = 'Stock Price Chart';
+            document.querySelector('#stock-graph-section .graph-placeholder p').textContent = 'Select a stock to see its historical performance.';
+            destroyChart(cryptoChartInstance); 
+        } else if (pageName === 'crypto') {
+            cryptoTabButton.classList.add('active');
+            cryptoPageContainer.classList.add('active');
+            cryptoInput.focus();
+            cryptoChartTitle.textContent = 'Cryptocurrency Price Chart';
+            document.querySelector('#crypto-graph-section .graph-placeholder p').textContent = 'Select a cryptocurrency to see its historical performance.';
+            destroyChart(stockChartInstance); 
+        }
+    }
+
+    stockTabButton.addEventListener('click', () => showPage('stocks'));
+    cryptoTabButton.addEventListener('click', () => showPage('crypto'));
+
+    function createAsterisks(count = 5) {
+        const bodyRect = document.body.getBoundingClientRect();
+        for (let i = 0; i < count; i++) {
+            const asterisk = document.createElement('div');
+            asterisk.classList.add('asterisk-effect');
+            asterisk.style.left = `${Math.random() * bodyRect.width}px`;
+            asterisk.style.top = `${Math.random() * bodyRect.height}px`;
+            asterisk.style.animationDelay = `${Math.random() * 2}s`;
+            document.body.appendChild(asterisk);
+
+            asterisk.addEventListener('animationend', () => {
+                asterisk.remove();
+            });
+        }
+    }
+
+    setInterval(createAsterisks, 3000);
+    createAsterisks(15);
+  </script>
+
+</body>
+</html>
